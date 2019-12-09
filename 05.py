@@ -10,6 +10,10 @@ class Opcode(Enum):
     MULT = 2
     INPUT = 3
     OUTPUT = 4
+    JUMP_IF_TRUE = 5
+    JUMP_IF_FALSE = 6
+    LESS_THAN = 7
+    EQUALS = 8
     HALT = 99
 
 class IntcodeProgram:
@@ -29,6 +33,8 @@ class IntcodeProgram:
         # immediate mode
         elif mode == 1:
             val = self.m[self.ip]
+        else:
+            raise ValueError(f'received invalid parameter get mode: {mode}')
         self.ip += 1
         return val
 
@@ -37,9 +43,8 @@ class IntcodeProgram:
         if mode == 0:
             addr = self.m[self.ip]
             self.m[addr] = val
-        # immediate mode
-        elif mode == 1:
-            self.m[self.ip] = val
+        else:
+            raise ValueError(f'received invalid parameter set mode: {mode}')
         self.ip += 1
 
     def run(self):
@@ -48,6 +53,10 @@ class IntcodeProgram:
             Opcode.MULT: 3,
             Opcode.INPUT: 1,
             Opcode.OUTPUT: 1,
+            Opcode.JUMP_IF_TRUE: 2,
+            Opcode.JUMP_IF_FALSE: 2,
+            Opcode.LESS_THAN: 3,
+            Opcode.EQUALS: 3,
             Opcode.HALT: 0,
         }
         while self.ip < len(self.m):
@@ -77,6 +86,26 @@ class IntcodeProgram:
                 )
             elif opcode == Opcode.OUTPUT:
                 self.outputs.append(self.get(param_modes[0]))
+            elif opcode == Opcode.JUMP_IF_TRUE:
+                condition = self.get(param_modes[0])
+                dest = self.get(param_modes[1])
+                if condition:
+                    self.ip = dest
+            elif opcode == Opcode.JUMP_IF_FALSE:
+                condition = self.get(param_modes[0])
+                dest = self.get(param_modes[1])
+                if not condition:
+                    self.ip = dest
+            elif opcode == Opcode.LESS_THAN:
+                self.set(
+                    param_modes[2],
+                    int(self.get(param_modes[0]) < self.get(param_modes[1]))
+                )
+            elif opcode == Opcode.EQUALS:
+                self.set(
+                    param_modes[2],
+                    int(self.get(param_modes[0]) == self.get(param_modes[1]))
+                )
             elif opcode == Opcode.HALT:
                 break
             else:
@@ -93,20 +122,16 @@ class IntcodeProgram:
 
 def main():
     with open('05.txt', 'r') as file:
-        memory = [int(v) for v in file.readline().split(',')]
-        inputs = [1]
-        program = IntcodeProgram(memory, inputs)
+        memory = [int(v) for v in file.readline().strip().split(',')]
 
-    print(f'part1: {part1(program)}')
+    print(f'part1: {run(IntcodeProgram(memory, [1]))}')
+    print(f'part2: {run(IntcodeProgram(memory, [5]))}')
 
-
-def part1(program):
+def run(program):
     outputs = program.run()
     print(outputs)
 
     return outputs[-1]
-
-
 
 if __name__ == '__main__':
     main()
