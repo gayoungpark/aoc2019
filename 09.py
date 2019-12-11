@@ -23,7 +23,6 @@ class IntcodeProgram:
         # current location of instruction pointer
         self.ip = 0
         self.inputs = input_vals
-        self.outputs = []
         self.relative_base = 0
 
     def get(self, mode):
@@ -58,6 +57,9 @@ class IntcodeProgram:
         self.ip += 1
 
     def run(self):
+        complete = False
+        outputs = []
+
         param_lens = {
             Opcode.ADD: 3,
             Opcode.MULT: 3,
@@ -89,14 +91,15 @@ class IntcodeProgram:
                 )
             elif opcode == Opcode.INPUT:
                 if len(self.inputs) == 0:
-                    raise IndexError('input is empty')
+                    self.ip -= 1
+                    break
                 input_val = self.inputs.pop(0)
                 self.set(
                     param_modes[0],
                     input_val
                 )
             elif opcode == Opcode.OUTPUT:
-                self.outputs.append(self.get(param_modes[0]))
+                outputs.append(self.get(param_modes[0]))
             elif opcode == Opcode.JUMP_IF_TRUE:
                 condition = self.get(param_modes[0])
                 dest = self.get(param_modes[1])
@@ -120,10 +123,11 @@ class IntcodeProgram:
             elif opcode == Opcode.SET_REL:
                 self.relative_base += self.get(param_modes[0])
             elif opcode == Opcode.HALT:
+                complete = True
                 break
             else:
                 raise ValueError(f'received invalid opcode: {opcode}')
-        return self.outputs
+        return outputs, complete
 
     def _get_modes(self, mode_digits, num):
         modes = []
@@ -141,7 +145,7 @@ def main():
     print(f'part1: {run(IntcodeProgram(memory, [2]))}')
 
 def run(program):
-    outputs = program.run()
+    outputs, _ = program.run()
     print(outputs)
 
     return outputs[-1]
