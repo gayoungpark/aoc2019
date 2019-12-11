@@ -143,9 +143,31 @@ class IntcodeProgram:
         return modes
 
 
+def paint(position, direction, painting, program):
+    while True:
+        program.add_inputs([painting[position]])
+
+        output, complete = program.run()
+        color, turn = output[0], output[1]
+
+        # save color output
+        painting[position] = color
+        # get new direction
+        direction = turn_robot(direction, turn)
+        # move robot
+        position = (
+            position[0] + direction[0],
+            position[1] + direction[1]
+        )
+
+        if complete:
+            break
+
+    return painting
+
 def turn_robot(old_direction: tuple, turn: int):
-    # up, left, bottom, right -- where (0, 0) is the top left corner
-    directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]
+    # up, left, bottom, right
+    directions = [(0, 1), (-1, 0), (0, -1), (1, 0)]
     idx = directions.index(old_direction)
 
     # turn left 90 degrees (idx + 1)
@@ -158,41 +180,52 @@ def turn_robot(old_direction: tuple, turn: int):
         raise Exception(f'cannot turn robot with turn output {turn}')
     return
 
+def print_painting(painting):
+    points = painting.keys()
+
+    min_x = min([point[0] for point in points])
+    max_x = max([point[0] for point in points])
+
+    min_y = min([point[1] for point in points])
+    max_y = max([point[1] for point in points])
+
+    for y in range(max_y, min_y - 1, -1):
+        for x in range(min_x, max_x + 1):
+            print('██' if painting[(x, y)] else '  ', end = '')
+        print()
+
 
 def main():
     with open('11.txt', 'r') as file:
         memory = [int(v) for v in file.readline().strip().split(',')]
 
     print(f'part1: {part1(memory)}')
-
+    print(f'part2:')
+    part2(memory)
 
 def part1(memory):
     robot_position = (0, 0)
-    robot_direction = (0, -1)
+    robot_direction = (0, 1)
     painting = defaultdict(int)
 
     program = IntcodeProgram(memory, [])
 
-    while True:
-        program.add_inputs([painting[robot_position]])
-
-        output, complete = program.run()
-        color, turn = output[0], output[1]
-
-        # save color output
-        painting[robot_position] = color
-        # get new direction
-        robot_direction = turn_robot(robot_direction, turn)
-        # update robot position
-        robot_position = (
-            robot_position[0] + robot_direction[0],
-            robot_position[1] + robot_direction[1]
-        )
-
-        if complete:
-            break
+    painting = paint(robot_position, robot_direction, painting, program)
 
     return len(painting.keys())
+
+def part2(memory):
+    robot_position = (0, 0)
+    robot_direction = (0, 1)
+    painting = defaultdict(int)
+
+    program = IntcodeProgram(memory, [])
+
+    # start on a white panel
+    painting[robot_position] = 1
+    painting = paint(robot_position, robot_direction, painting, program)
+
+    print_painting(painting)
 
 
 if __name__ == '__main__':
