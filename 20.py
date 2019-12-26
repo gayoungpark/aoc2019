@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from copy import deepcopy
 from enum import Enum
 from queue import Queue
@@ -13,6 +13,7 @@ def main():
 
     m = parse_map(raw_map)
     print(f'part1: {part1(m)}')
+    print(f'part2: {part2(m)}')
 
 def part1(m):
     queue = Queue()
@@ -21,25 +22,36 @@ def part1(m):
     # set of visited position tuples (x, y)
     visited = set()
 
-    # path = {m.start: None}
     while not queue.empty():
         dist, pos = queue.get()
         if pos == m.end:
-            # print path for debugging purposes
-            # node = pos
-            # path_str = ''
-            # while node:
-            #     path_str = f'{node}, {m.m[node[1]][node[0]].char} -> {path_str}'
-            #     node = path[node]
-            # print(path_str)
             return dist
         neighbors = get_neighbors(m, pos[0], pos[1])
         for neighbor in neighbors:
             if neighbor not in visited:
                 queue.put((dist + 1, neighbor))
-                # path[neighbor] = pos
         visited.add(pos)
-    return 0
+    return -1
+
+def part2(m):
+    Node = namedtuple('Node', ['dist', 'level', 'x', 'y'])
+
+    queue = Queue()
+    queue.put(Node(0, 0, m.start[0], m.start[1]))
+
+    # set of visited position tuples (x, y)
+    visited = set()
+
+    while not queue.empty():
+        node = queue.get()
+        if node.level == 0 and node.x == m.end[0] and node.y == m.end[1]:
+            return node.dist
+        neighbors = get_recusive_neighbors(m, node.level, node.x, node.y)
+        for nlevel, nx, ny in neighbors:
+            if (nlevel, nx, ny) not in visited:
+                queue.put(Node(node.dist + 1, nlevel, nx, ny))
+        visited.add((node.level, node.x, node.y))
+    return -1
 
 def get_neighbors(m, x, y):
     possibilities = [
@@ -53,17 +65,42 @@ def get_neighbors(m, x, y):
     # check cardinal neighbors
     for nx, ny in possibilities:
         n_tile = m.m[ny][nx]
-        if n_tile.type in [TileType.PATH, TileType.PORTAL]:
+        if n_tile.type != TileType.WALL:
             neighbors.append((nx, ny))
     # check portal neighbor
-    if m.m[y][x].type == TileType.PORTAL:
+    if m.m[y][x].type in [TileType.INNER_PORTAL, TileType.OUTER_PORTAL]:
         neighbors.append(m.portals[(x, y)])
+    return neighbors
+
+def get_recusive_neighbors(m, level, x, y):
+    possibilities = [
+        (x + 1, y),
+        (x - 1, y),
+        (x, y + 1),
+        (x, y - 1),
+    ]
+
+    neighbors = []
+    # check cardinal neighbors
+    for nx, ny in possibilities:
+        n_tile = m.m[ny][nx]
+        if n_tile.type != TileType.WALL:
+            neighbors.append((level, nx, ny))
+    # check portal neighbor
+    center_type = m.m[y][x].type
+    if center_type == TileType.INNER_PORTAL:
+        nx, ny = m.portals[(x, y)]
+        neighbors.append((level + 1, nx, ny))
+    elif center_type == TileType.OUTER_PORTAL and level != 0:
+        nx, ny = m.portals[(x, y)]
+        neighbors.append((level - 1, nx, ny))
     return neighbors
 
 class TileType(Enum):
     PATH = 1
     WALL = 2
-    PORTAL = 3
+    INNER_PORTAL = 3
+    OUTER_PORTAL = 4
 
 class Tile:
     def __init__(self, pos, tile_type, char):
@@ -79,9 +116,17 @@ class Map:
         self.m = m
         self.start = start
         self.end = end
-        self.portals = self.update_portals(portals)
+        self.portals = self._update_portals(portals)
 
-    def update_portals(self, portals):
+    def _get_portal_type(self, position):
+        x, y = position
+        # outer portals are near the border
+        if x in [2, len(self.m[0]) - 3] or y in [2, len(self.m) - 3]:
+            return TileType.OUTER_PORTAL
+        else:
+            return TileType.INNER_PORTAL
+
+    def _update_portals(self, portals):
         # create a mapping for portals
         m = {}
         for label, positions in portals.items():
@@ -92,7 +137,7 @@ class Map:
             m[p2] = p1
             for p in positions:
                 # update tile type for portals
-                self.m[p[1]][p[0]].type = TileType.PORTAL
+                self.m[p[1]][p[0]].type = self._get_portal_type(p)
         return m
 
     def __repr__(self):
