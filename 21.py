@@ -148,11 +148,17 @@ def main():
         memory = [int(v) for v in file.readline().strip().split(',')]
 
     print(f'part1: {part1(memory)}')
+    print(f'part2: {part2(memory)}')
 
 def part1(memory):
+    return run_springdroid(memory, get_springscript1())
+
+def part2(memory):
+    return run_springdroid(memory, get_springscript2())
+
+def run_springdroid(memory, springscript):
     program = IntcodeProgram(memory, [])
 
-    springscript = get_springscript()
     program.add_inputs([ord(c) for c in springscript])
     outputs, complete = program.run()
 
@@ -168,20 +174,58 @@ def part1(memory):
     print(draw)
     return -1
 
+def get_springscript1():
+    """
+    T, J start out False.
+    A, B, C, D - Ground(T), Hole(F)
 
-def get_springscript():
-    # T, J start out False
-    # A, B, C, D will be True if there's ground, False if there's a hole
+    JUMP:
+       ABCD
+    1) .###
+    2) #..#
+    3) #.##
+    """
     instructions = [
-        # T will be False if any of A, B, C has a hole
+        # jump if any of A, B, C is a hole
         'OR A T\n',
         'AND B T\n',
         'AND C T\n',
-        # J will be True if any of A, B, C has a hole
         'NOT T J\n',
-        # JUMP if D is Ground and any of A, B, C has a hole
+        # jump only if D is ground
         'AND D J\n',
         'WALK\n',
+    ]
+    script = ''
+    for instruction in instructions:
+        script += instruction
+    return script
+
+def get_springscript2():
+    """
+    T, J start out False.
+    A, B, C, D, E, F, G, H, I - Ground(T), Hole(F)
+
+    JUMP:
+          *   *
+       ABCDEFGHI
+    1) .########
+    2) #..#.####
+    3) .#.##..##
+    4) #..##.##.
+    """
+    instructions = [
+        # 1) jump if A is a hole
+        'NOT A J\n',
+        # 2, 3) jump if C is a hole and H is not a hole
+        'NOT C T\n',
+        'AND H T\n',
+        'OR T J\n',
+        # 4) jump if B is a hole
+        'NOT B T\n',
+        'OR T J\n',
+        # walk if D is a hole
+        'AND D J\n',
+        'RUN\n',
     ]
     script = ''
     for instruction in instructions:
