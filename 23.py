@@ -144,6 +144,61 @@ class IntcodeProgram:
         return modes
 
 
+class Computers:
+    def __init__(self, memory, n):
+        self.n = n
+        self.computers = self._create_computers(memory)
+        self.packets = [Queue() for _ in range(n)]
+        self.NAT = None
+
+    def _create_computers(self, memory):
+        computers = []
+        for addr in range(self.n):
+            computer = IntcodeProgram(memory, [addr])
+            outputs, _ = computer.run()
+            if len(outputs):
+                raise Exception(f'received output of length {len(outputs)}: {outputs}')
+            computers.append(computer)
+        return computers
+
+    def _get_inputs(self, addr):
+        queue = self.packets[addr]
+        if not queue.empty():
+            return queue.get()
+        else:
+            return [-1]
+
+    def process_outputs(self, outputs):
+        while len(outputs) >= 3:
+            addr, x, y = outputs[0], outputs[1], outputs[2]
+            if 0 <= addr <= self.n:
+                self.packets[addr].put([x, y])
+            elif addr == 255:
+                self.NAT = [x, y]
+            else:
+                raise Exception(f'received addr out of range: {addr}')
+            outputs = outputs[3:]
+
+    def run(self):
+        """Go through all computers and run them once each.
+
+        Run computer by:
+         1) sending a packet from its queue, -1 if no packet available.
+         2) processing output packets [addr, x, y] by adding [x, y] to the correct addr queue.
+        """
+        for addr in range(self.n):
+            computer = self.computers[addr]
+            computer.add_inputs(self._get_inputs(addr))
+            outputs, _ = computer.run()
+            self.process_outputs(outputs)
+
+    def check_idle(self):
+        for packet in self.packets:
+            if not packet.empty():
+                return False
+        return True
+
+
 def main():
     with open('23.txt', 'r') as file:
         memory = [int(v) for v in file.readline().strip().split(',')]
@@ -152,99 +207,37 @@ def main():
     print(f'part2: {part2(memory)}')
 
 def part1(memory):
-    n = 50
-    computers = []
-    packets = []
+    computers = Computers(memory, 50)
 
-    # initialize n computers
-    for addr in range(n):
-        computer = IntcodeProgram(memory, [addr])
-        outputs, _ = computer.run()
-        if len(outputs):
-            raise Exception(f'received output of length {len(outputs)}: {outputs}')
-        computers.append(computer)
-        packets.append(Queue())
-
-    # send and receive packets
     while True:
-        for addr in range(n):
-            queue = packets[addr]
-            computer = computers[addr]
-
-            computer.add_inputs(queue.get() if not queue.empty() else [-1])
-            outputs, _ = computer.run()
-            # process outputs
-            while len(outputs) >= 3:
-                addr, x, y = outputs[0], outputs[1], outputs[2]
-                if 0 <= addr <= n:
-                    packets[addr].put([x, y])
-                elif addr == 255:
-                    return y
-                else:
-                    raise Exception(f'received addr out of range: {addr}')
-                outputs = outputs[3:]
+        computers.run()
+        if computers.NAT:
+            return computers.NAT[1]
     return -1
 
 def part2(memory):
-    n = 50
-    computers = []
-    packets = []
-    NAT = None
-    NAT_y = set()
-
-    # initialize n computers
-    for addr in range(n):
-        computer = IntcodeProgram(memory, [addr])
-        outputs, _ = computer.run()
-        if len(outputs):
-            raise Exception(f'received output of length {len(outputs)}: {outputs}')
-        computers.append(computer)
-        packets.append(Queue())
+    computers = Computers(memory, 50)
+    y_set = set()
 
     while True:
         # check for idle state and send NAT to computer at addr 0
-        if check_idle(packets) and NAT is not None:
-            if NAT[1] in NAT_y:
-                return NAT[1]
+        NAT = computers.NAT
+        if computers.check_idle() and NAT:
+            # look for first y value delivered by the NAT twice in a row
+            y = NAT[1]
+            if y in y_set:
+                return y
             else:
-                NAT_y.add(NAT[1])
-            computer = computers[0]
+                y_set.add(y)
+            # send NAT to computer at addr 0
+            computer = computers.computers[0]
             computer.add_inputs(NAT)
             outputs, _ = computer.run()
-            # process outputs
-            while len(outputs) >= 3:
-                addr, x, y = outputs[0], outputs[1], outputs[2]
-                if 0 <= addr <= n:
-                    packets[addr].put([x, y])
-                elif addr == 255:
-                    NAT = [x, y]
-                else:
-                    raise Exception(f'received addr out of range: {addr}')
-                outputs = outputs[3:]
+            computers.process_outputs(outputs)
         # send and receive packets
-        for addr in range(n):
-            queue = packets[addr]
-            computer = computers[addr]
+        computers.run()
 
-            computer.add_inputs(queue.get() if not queue.empty() else [-1])
-            outputs, _ = computer.run()
-            # process outputs
-            while len(outputs) >= 3:
-                addr, x, y = outputs[0], outputs[1], outputs[2]
-                if 0 <= addr <= n:
-                    packets[addr].put([x, y])
-                elif addr == 255:
-                    NAT = [x, y]
-                else:
-                    raise Exception(f'received addr out of range: {addr}')
-                outputs = outputs[3:]
     return -1
-
-def check_idle(packets):
-    for packet in packets:
-        if not packet.empty():
-            return False
-    return True
 
 if __name__ == '__main__':
     main()
