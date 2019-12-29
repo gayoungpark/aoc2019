@@ -149,6 +149,7 @@ def main():
         memory = [int(v) for v in file.readline().strip().split(',')]
 
     print(f'part1: {part1(memory)}')
+    print(f'part2: {part2(memory)}')
 
 def part1(memory):
     n = 50
@@ -183,6 +184,67 @@ def part1(memory):
                     raise Exception(f'received addr out of range: {addr}')
                 outputs = outputs[3:]
     return -1
+
+def part2(memory):
+    n = 50
+    computers = []
+    packets = []
+    NAT = None
+    NAT_y = set()
+
+    # initialize n computers
+    for addr in range(n):
+        computer = IntcodeProgram(memory, [addr])
+        outputs, _ = computer.run()
+        if len(outputs):
+            raise Exception(f'received output of length {len(outputs)}: {outputs}')
+        computers.append(computer)
+        packets.append(Queue())
+
+    while True:
+        # check for idle state and send NAT to computer at addr 0
+        if check_idle(packets) and NAT is not None:
+            if NAT[1] in NAT_y:
+                return NAT[1]
+            else:
+                NAT_y.add(NAT[1])
+            computer = computers[0]
+            computer.add_inputs(NAT)
+            outputs, _ = computer.run()
+            # process outputs
+            while len(outputs) >= 3:
+                addr, x, y = outputs[0], outputs[1], outputs[2]
+                if 0 <= addr <= n:
+                    packets[addr].put([x, y])
+                elif addr == 255:
+                    NAT = [x, y]
+                else:
+                    raise Exception(f'received addr out of range: {addr}')
+                outputs = outputs[3:]
+        # send and receive packets
+        for addr in range(n):
+            queue = packets[addr]
+            computer = computers[addr]
+
+            computer.add_inputs(queue.get() if not queue.empty() else [-1])
+            outputs, _ = computer.run()
+            # process outputs
+            while len(outputs) >= 3:
+                addr, x, y = outputs[0], outputs[1], outputs[2]
+                if 0 <= addr <= n:
+                    packets[addr].put([x, y])
+                elif addr == 255:
+                    NAT = [x, y]
+                else:
+                    raise Exception(f'received addr out of range: {addr}')
+                outputs = outputs[3:]
+    return -1
+
+def check_idle(packets):
+    for packet in packets:
+        if not packet.empty():
+            return False
+    return True
 
 if __name__ == '__main__':
     main()
